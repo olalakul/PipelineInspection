@@ -1,18 +1,5 @@
 """
-author: Olga Lalakulich (olalakul AT gmail.com)
-Pipeline inspection. Example of Python code.
-Problem.
---------
-In pipeline inspection analysis, rectangular boxes are drawn to indicate regions 
-that might contain anomalies. The location of the rectangular box is determined 
-by its initial position in the longitudinal axis (in meters) and its initial 
-position in the circumferential axis (in degrees). The length (in meters) and 
-width (in degrees, from 0 to 360) of the boxes are also available. A new 
-inspection run has been conducted on a pipeline (which was already inspected 
-in the past) and new rectangular boxes have been drawn. We want to verify whether
-the boxes from the new run and the boxes from the old run have the same location
-in the pipeline. In other words, we want to check if one new box and one old box
-overlap, not necessarily in all their area but at least in a portion of it. 
+@author: Olga Lalakulich (olalakul@gmail.com)
 """
 
 """
@@ -50,31 +37,64 @@ class Rect:
         Please name your rectange ("name" as string).
         If not, name will be automatically generated.
         """
-        assert 0<=B<=360, "initial position in the circumferencial axis should be between 0 and 360 degrees"
-        assert length>0, "length should be positive"
-        assert 0<=width<=360, "width should be between 0 and 360 degrees"
         self.id = self._ids.next()
-        self.L = L #  left edge in meters
-        self.R = L + length # right edge in meters
-        self.B = B #  bottom edge in degrees
+        self._L = L #  left edge in meters
+        self._length = length
+        self._R = self._L + self._length # right edge in meters
+        self._B = B #  bottom edge in degrees
         #self.T = (B + width)%360 #  top edge in degrees #curerntly not used
-        #self.length = length  # currently not used
-        self.width = width
-        self.midangle = (B+width/2.)%360 # midangle in degrees # used for circumferential alignment
+        self._width = width
+        self._midangle = (self._B + self._width/2.)%360 # midangle in degrees # used for circumferential alignment
         if name=='':
             self.name="rect"+str(self.id)
         else:
             self.name = name
+
+
+        @property
+        def B(self):
+            return self._B
+            
+        @B.setter
+        def B(self, value):
+            if not 0 <= value < 360:
+                print("Your width is converted to the range from 0 to 360 degrees")
+                value = value%360
+            self._B = value
+
+        @property
+        def length(self):
+            return self._length
+            
+        @length.setter
+        def length(self, value):
+            if 0 < length:
+                raise ValueError("Length must be positive")
+            self._L = value
+
+        @property
+        def width(self):
+            return self._width
+            
+        @width.setter
+        def width(self, value):
+            if not 0 <= value < 360:
+                raise ValueError("Width should be positive and less than 360")
+            self._width = value
+
+
+
+
         
     def __repr__(self):
         """
         String representation for Rect
         """
-        rep = "[Rectangle '" + self.name + "' with left edge " + str(self.L)
-        rep += ", right edge " + str(self.R)
-        rep += ", bottom edge " + str(self.B)
-        rep += ", midangle " + str(self.midangle)
-        rep += ", half-width " + str(self.width/2) + "]"
+        rep = "[Rectangle '" + self.name + "' with left edge " + str(self._L)
+        rep += ", right edge " + str(self._R)
+        rep += ", bottom edge " + str(self._B)
+        rep += ", midangle " + str(self._midangle)
+        rep += ", half-width " + str(self._width/2) + "]"
         return rep
         
     def to_the_left_of(self, another):
@@ -82,14 +102,14 @@ class Rect:
         Returns True of self is to the left of other, else False
         Situations with "overlap" over a line or point are counted as True
         """
-        return (self.R <= another.L)
+        return (self._R <= another._L)
 
     def to_the_right_of(self, another):
         """
         Returns True of self is to the left of other, else False
         Situations with "overlap" over a line or point are counted as True
         """
-        return (self.L >= another.R)
+        return (self._L >= another._R)
 
     def overlap_along_circumferential(self, another):
         """
@@ -97,10 +117,11 @@ class Rect:
         Situations with "overlap" over a line or point are counted as NOT-overlap
         >>> re5.overlap_along_circumferential(re6)
         True
+
         """
-        dist_midangles = abs((self.midangle - another.midangle +180.)%360 -180)
+        dist_midangles = abs((self._midangle - another._midangle +180.)%360 -180)
         # overlap if distance between midangles is less than sum of half-widths
-        return dist_midangles < (self.width + another.width)/2.
+        return dist_midangles < (self._width + another._width)/2.
 
     def overlap_with(self, another):
         """
@@ -122,9 +143,6 @@ class Rect:
         return ( not(self.to_the_left_of(another)) and  
                  not(self.to_the_right_of(another)) and  
                  self.overlap_along_circumferential(another) )
-
-    #def __eq__(self, another):
-    #        return self.id == another.id
 
 
 """
@@ -170,7 +188,7 @@ and remove those which are to the left
 for overlapping  in circumferential direction
 Implemented as overlap_between_two(old, new)
 """
-def overlap_between_two(old, new, visualize=True):
+def overlap_between_two(old, new):
     """
     Finds rectangle overlaps between "old" and "new" containers of lengthes n and m.
     Complexity is O(n*log(n) + m*log(m)) and is dominated by sorting.
@@ -179,37 +197,15 @@ def overlap_between_two(old, new, visualize=True):
     INPUTS:
     old - python container with rectangles
     new - another python container with rectangles
-    visualize - if True, produce 3D figure with  each pair of overlapping rectangles
     OUTPUT:
     set of tuples with the names of rectangles in each overlapping pair
-    >>> overlap_between_two([re5, re3, re1], [re4, re6, re2], visualize=False)
+    >>> overlap_between_two([re5, re3, re1], [re4, re6, re2])
     set([('re1', 're2'), ('re5', 're6'), ('re5', 're2')])
     """
     from collections import deque
-    import matplotlib.pyplot as plt
-    import mpl_toolkits.mplot3d
-    import numpy as np
-    
-    if visualize:
-        def xyz(phi1,phi2, h1,h2):
-            phi = np.linspace(phi1,phi2, 100)
-            r = np.ones(100)*10.
-            h = np.linspace(h1,h2,100)
-            y = np.outer(np.cos(phi),r)     
-            z = np.outer(np.sin(phi),r)     
-            x = np.outer(np.ones(np.size(r)),h)
-            return x,y,z
-            
-        fig = plt.figure()
-        ax = mpl_toolkits.mplot3d.Axes3D(fig)
-        ax.view_init(200,260)
-        x,y,z = xyz(0,2*np.pi,0,100)
-        ax.plot_surface(x,y,z,rstride=5, cstride=10, linewidth=1, color='white', alpha=0.1)    
-    
-    
     # sort old  and new by left(L) coordinate
-    list1 = sorted(old, key = lambda elem: elem.L)
-    list2 = sorted(new, key = lambda elem: elem.L, reverse=True) # reverse for O(1) pop
+    list1 = sorted(old, key = lambda elem: elem._L)
+    list2 = sorted(new, key = lambda elem: elem._L, reverse=True) # reverse for O(1) pop
     
     overlap_set = set([]) # set to store overlapping rectangles
     q2 = deque() # queue to store candidates (those horizontally overlapped with element in list1)
@@ -234,14 +230,13 @@ def overlap_between_two(old, new, visualize=True):
         for elem in q2:
             if rect.overlap_along_circumferential(elem):
                 overlap_set.add((rect.name, elem.name)) # add to the set if overlap
-                # add visulization
-                if visualize:
-                    x1,y1,z1 = xyz(np.radians(rect.B),np.radians(rect.B+rect.width),rect.L,rect.R)
-                    x2,y2,z2 = xyz(np.radians(elem.B),np.radians(elem.B+elem.width),elem.L,elem.R)
-                    ax.plot_surface(x1,y1,z1,linewidth=0, color='red', alpha=0.5)
-                    ax.plot_surface(x2,y2,z2,linewidth=0, color='blue', alpha=0.5)
-                    fig.show()
+
     return overlap_set                
+"""
+This function can be suppelemented to produce during its run the 3D figure with 
+each pair of overlapping rectangles (as in OlgaLalakulich-test.pdf). 
+The code can be presented at the interview.
+"""
 
 
 """
@@ -254,51 +249,15 @@ For the following technical situation
 not-to-the-left of the current (using right-edge-sorted list) and those not-to-the-right 
 of the current (using left-edge-sorted list). Intersection of found are candidates.
 3) Check each candidate for overlapping with current in circumferential direction.
+The code can be presented at the interview.
 """
 def overlap_between_two_left_right(old, new):
-    """
-    >>> re1 = Rect(0,25, 5,25, "re1"); re2 = Rect(5,20, 0,10, "re2"); re3 = Rect(10,10, 30,10, "re3")
-    >>> re4 = Rect(15,9, 40,20, "re4"); re5 = Rect(20,10, 340,30, "re5"); re6 = Rect(25,9, 0,10, "re6")
-    >>> list1 = [re5, re3, re1];  list2 = [re4, re6, re2]
-    >>> overlap_between_two_left_right(list1, list2)
-    set([('re6', 're5'), ('re2', 're1'), ('re2', 're5')])
-    """
-    import bisect
-    # sort old  by the left edge and then separately by the right
-    old_left = sorted(old, key = lambda elem: elem.L)
-    left_edges = [j.L for j in old_left]
-    old_right = sorted(old, key = lambda elem: elem.R)
-    right_edges = [j.R for j in old_right]    
-    
-    overlap_set = set([]) # set to store overlapping rectangles
-    candidates_set = set([])
-    # loop through "new"    
-    for rect in new:
-        # above this index, rect is to the left of others # O(log(n))
-        il = bisect.bisect_left(left_edges, rect.R)
-        # below this index, rect is to the right of others  # O(log(n))
-        ir = bisect.bisect_right(right_edges, rect.L)
-        # candidates are intersection of those not to the left and not to the right
-        candidates_set = set(old_left[:il]).intersection(set(old_right[ir:]))
-        #
-        for elem in candidates_set:
-            if rect.overlap_along_circumferential(elem):
-                overlap_set.add((rect.name, elem.name)) # add to the set if overlap
-
-    return overlap_set                
-
-
-#re1 = Rect(0,25, 5,25, "re1"); re2 = Rect(5,20, 0,10, "re2"); re3 = Rect(10,10, 30,10, "re3")
-#re4 = Rect(15,9, 40,20, "re4"); re5 = Rect(20,10, 340,30, "re5"); re6 = Rect(25,9, 0,10, "re6")
-#list1 = [re5, re3, re1];  list2 = [re4, re6, re2]
-#list3 = [re5, re1, re4];  list4 = [re3, re2, re6]
-#overlap_between_two_left_right(list3, list4)
-#overlap_between_two(list1, list2, visualize=False)
-#greedy_overlap_between_two(list3, list4)
+    pass
 
 """
-Hire me. Contact e-mail: olalakul AT gmail.com
+Hire me. Contact e-mail: olalakul@gmail.com
 """
+
 if __name__ == "__main__":
     import doctest
     doctest.testmod(verbose=True, extraglobs={'re1': Rect(0,25, 5,25, "re1"),

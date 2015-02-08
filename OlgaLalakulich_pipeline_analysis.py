@@ -1,5 +1,18 @@
 """
-@author: Olga Lalakulich (olalakul@gmail.com)
+author: Olga Lalakulich (olalakul AT gmail.com)
+Pipeline inspection. Example of Python code.
+Problem.
+--------
+In pipeline inspection analysis, rectangular boxes are drawn to indicate regions 
+that might contain anomalies. The location of the rectangular box is determined 
+by its initial position in the longitudinal axis (in meters) and its initial 
+position in the circumferential axis (in degrees). The length (in meters) and 
+width (in degrees, from 0 to 360) of the boxes are also available. A new 
+inspection run has been conducted on a pipeline (which was already inspected 
+in the past) and new rectangular boxes have been drawn. We want to verify whether
+the boxes from the new run and the boxes from the old run have the same location
+in the pipeline. In other words, we want to check if one new box and one old box
+overlap, not necessarily in all their area but at least in a portion of it. 
 """
 
 """
@@ -234,7 +247,7 @@ def overlap_between_two(old, new):
     return overlap_set                
 """
 This function can be suppelemented to produce during its run the 3D figure with 
-each pair of overlapping rectangles (as in OlgaLalakulich-test.pdf). 
+each pair of overlapping rectangles (as in overlapping_rectangles_3D.png). 
 The code can be presented at the interview.
 """
 
